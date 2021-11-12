@@ -1,0 +1,85 @@
+name: Release
+
+# Controls when the workflow will run
+on:
+  push:
+    branches: [ master ]
+    
+jobs:
+  checkout:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name : GITHUB CONTEXT
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: echo "$GITHUB_CONTEXT"
+
+  generate-inmutable-version:
+    needs: checkout
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        
+      - name: Set up JDK 8
+        uses: actions/setup-java@v2
+        with:
+          java-version: '8'
+          distribution: 'adopt'
+          cache: maven
+          
+      - name: Build
+        run: |
+          mvn package
+          echo "artifact_name=$(ls ${{github.workspace}}/target | grep jar)" >> $GITHUB_ENV
+          echo "release_version=$(ls ${{github.workspace}}/target | grep jar | egrep -o '[[:digit:]].[[:digit:]].[[:digit:]]' -o)" >> $GITHUB_ENV
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ env.artifact_name }}
+          path: target/*.jar
+      
+      - name: Tag snapshot
+        uses: tvdias/github-tagger@v0.0.1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ env.release_version }}
+      
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        with:
+          tag_name: ${{ env.release_version }}
+          release_name: Release ${{ env.release_version }}
+          draft: false
+          prerelease: false
+          
+  deploy-to-PRO:
+    needs: generate-inmutable-version
+    runs-on: ubuntu-latest
+    environment: 'PRO'
+
+    steps:
+      - name: deploy-to-PRO
+        run: echo Deploy to PRO    
+        
+  tests:
+    needs: deploy-to-PRO
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: tests
+        run: echo Running tests    
+        
+  post:
+    needs: tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: post
+        run: echo Running post actions
