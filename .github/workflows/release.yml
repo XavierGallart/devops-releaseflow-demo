@@ -114,7 +114,7 @@ jobs:
       - name: deploy-to-UA
         run: echo Deploy to UA
 
-generate-inmutable-version:
+  generate-inmutable-version:
     needs: [deploy-to-QA, deploy-to-UA]
     runs-on: ubuntu-latest
 
